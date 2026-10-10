@@ -30,6 +30,12 @@ val debugKeyPassword = System.getenv("RYTHIM_DEBUG_KEY_PASSWORD")?.takeIf { it.i
 val persistentDebugKeystoreFile = file("persistent-debug.keystore")
 val workflowDebugKeystoreFile = debugKeystorePathOverride?.let(::file)
 
+// CEK KETERSEDIAAN SDK DISCORD DI LEVEL ATAS
+val discordAarFile = file("libs/discord_partner_sdk.aar")
+val hasRealDiscordSdk = discordAarFile.exists() && zipTree(discordAarFile).matching {
+    include("jni/**/libdiscord_partner_sdk.so")
+}.files.isNotEmpty()
+
 plugins {
     id("com.android.application")
     alias(libs.plugins.hilt)
@@ -137,12 +143,6 @@ android {
             buildConfigField("Long", "DISCORD_APP_ID", "1447278780795064401L")
             manifestPlaceholders["discordAppId"] = "1447278780795064401"
 
-            // CEK KETERSEDIAAN SDK DISCORD
-            val discordAar = file("libs/discord_partner_sdk.aar")
-            val hasRealDiscordSdk = discordAar.exists() && zipTree(discordAar).matching {
-                include("jni/**/libdiscord_partner_sdk.so")
-            }.files.isNotEmpty()
-
             if (hasRealDiscordSdk) {
                 externalNativeBuild {
                     cmake {
@@ -165,6 +165,16 @@ android {
             buildConfigField("Boolean", "CAST_AVAILABLE", "false")
             buildConfigField("Boolean", "UPDATER_AVAILABLE", "false")
             buildConfigField("Boolean", "DISCORD_RPC_AVAILABLE", "false")
+        }
+    }
+
+    // KECUALIKAN FILE KOTLIN DISCORD JIKA SDK TIDAK TERSEDIA
+    sourceSets {
+        getByName("gms") {
+            if (!hasRealDiscordSdk) {
+                kotlin.exclude("**/DiscordRpcManager.kt")
+                kotlin.exclude("**/DiscordSdkHelper.kt")
+            }
         }
     }
 
