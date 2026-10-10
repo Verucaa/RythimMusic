@@ -10,7 +10,7 @@ import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.TaskAction
 import org.gradle.process.ExecOperations
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-import java.net.URL
+import java.net.URI
 import java.util.Properties
 import javax.inject.Inject
 
@@ -66,7 +66,7 @@ abstract class GenerateProtoTask : DefaultTask() {
             val url = protocUrl.get()
             logger.lifecycle("Downloading protoc ${url.substringAfterLast('/')} from $url")
             protocFile.parentFile.mkdirs()
-            URL(url).openStream().use { input ->
+            URI(url).toURL().openStream().use { input ->
                 protocFile.outputStream().use { output ->
                     input.copyTo(output)
                 }
@@ -137,9 +137,24 @@ android {
             buildConfigField("Long", "DISCORD_APP_ID", "1447278780795064401L")
             manifestPlaceholders["discordAppId"] = "1447278780795064401"
 
-            externalNativeBuild {
-                cmake {
-                    arguments("-DDISCORD_BRIDGE=ON")
+            // CEK KETERSEDIAAN SDK DISCORD
+            val discordAar = file("libs/discord_partner_sdk.aar")
+            val hasRealDiscordSdk = discordAar.exists() && zipTree(discordAar).matching {
+                include("jni/**/libdiscord_partner_sdk.so")
+            }.files.isNotEmpty()
+
+            if (hasRealDiscordSdk) {
+                externalNativeBuild {
+                    cmake {
+                        arguments("-DDISCORD_BRIDGE=ON")
+                    }
+                }
+            } else {
+                logger.lifecycle("⚠️ Discord SDK AAR tidak ditemukan atau kosong. Build GMS tanpa Discord RPC.")
+                externalNativeBuild {
+                    cmake {
+                        arguments("-DDISCORD_BRIDGE=OFF")
+                    }
                 }
             }
         }
@@ -300,7 +315,7 @@ val protoFile = protoDir.resolve("listentogether.proto")
 
 val generateProto = if (protoFile.exists()) {
     val protocUrl = getProtocUrl()
-    val protocFileName = URL(protocUrl).path.substringAfterLast('/')
+    val protocFileName = URI(protocUrl).path.substringAfterLast('/')
 
     tasks.register<GenerateProtoTask>("generateProto") {
         group = "build"
